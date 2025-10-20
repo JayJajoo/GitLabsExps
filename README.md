@@ -1,139 +1,126 @@
-# GitHub Actions and GCP Connections: Beginner Lab
+# MLOps Pipeline: Automated Model Training & Deployment
 
-## Overview
-Welcome to the "GitHub Actions and GCP Connections" beginner lab! In this lab, you will learn how to automate a machine learning workflow using GitHub Actions and Google Cloud Platform (GCP). By the end of the lab, you will understand how to connect GitHub Actions to GCP, allowing you to automate the process of training a machine learning model and uploading the results to Google Cloud Storage (GCS).
+[![GitHub Actions](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF?logo=github-actions)](https://github.com/JayJajoo/GitLabsExps/actions)
+[![Python](https://img.shields.io/badge/Python-3.10-3776AB?logo=python)](https://www.python.org/)
+[![GCP](https://img.shields.io/badge/Cloud-Google%20Cloud-4285F4?logo=google-cloud)](https://cloud.google.com/)
 
-The provided project includes a simple machine learning model (RandomForestClassifier) trained on the Iris dataset. Your focus will be on setting up the cloud environment and automating the workflow using GitHub Actions.
+An automated MLOps pipeline that trains a Random Forest classifier on the Iris dataset, validates model performance, stores models in Google Cloud Storage, and sends email reports—all triggered through GitHub Actions.
 
-## Learning Objectives
-By completing this lab, you will:
+## 🚀 Features
 
-1. Learn how to set up a GCP project and configure a service account for automation.
-2. Understand how to grant GitHub Actions access to your GCP project.
-3. Automate the process of training and saving a model using GitHub Actions.
-4. Use Google Cloud Storage (GCS) to store your trained machine learning model.
+- **Automated Training**: Train Random Forest models on the Iris dataset
+- **Quality Gate**: 75% accuracy threshold prevents deployment of poor models
+- **Cloud Storage**: Automatic model versioning and storage in GCS
+- **Email Notifications**: Detailed classification reports sent via email
+- **CI/CD Pipeline**: Fully automated workflow using GitHub Actions
+- **Dependency Caching**: Optimized build times with pip cache
 
-## Setup
+## 📋 Prerequisites
 
-### Step 1: Create a New GitHub Repository
-1. Go to GitHub and create a new repository. Name it something like `gh-actions-gcp-beginner-lab`.
-2. Don't initialize the repository with a README or .gitignore.
-3. Note the URL of your new repository.
+- Python 3.10+
+- Google Cloud Platform account with a storage bucket
+- Gmail account for sending email reports
+- GitHub repository with Actions enabled
 
-### Step 2: Clone the Template Repository and Set Up Your Project
-Instead of cloning the original repository directly, we'll clone it, then push it to your new repository:
+## 🔧 Setup
 
-```bash
-# Clone the template repository
-git clone https://github.com/AshyScripts/github-actions-gcp-beginner-lab.git
-
-# Navigate into the new directory
-cd github-actions-gcp-beginner-lab
-
-# Remove the existing Git configuration
-rm -rf .git
-
-# Initialize a new Git repository
-git init
-
-# Add all files to the new repository
-git add .
-
-# Commit the files
-git commit -m "Initial commit"
-
-# Set the remote to your new GitHub repository
-git remote add origin https://github.com/your-username/gh-actions-gcp-beginner-lab.git
-
-# Push the code to your new repository
-git push -u origin main
-```
-
-Replace `your-username` with your actual GitHub username in the remote URL.
-
-### Step 3: Create a Virtual Environment and Install Dependencies
-To follow along this lab, you need to install required dependencies:
+### 1. Clone the Repository
 
 ```bash
-python -m venv venv
-source venv/bin/activate  # For Windows, use `venv\Scripts\activate`
-pip install -r requirements.txt
+git clone https://github.com/JayJajoo/GitLabsExps.git
+cd GitLabsExps
 ```
 
-### Step 4: Set Up Google Cloud Platform (GCP)
-1. Create a New GCP Project in Google Cloud Console. 
-2. Create a service account and give it the required roles and permissions to interact with Google Cloud Storage. Go to `IAM & Admin` section and add the `Storage Admin` role.
-3. Generate a JSON key for the service account. Save it securely.
+### 3. Configure Google Cloud Storage
 
-### Step 5: Create a Google Cloud Storage (GCS) Bucket
-1. Go to Google Cloud Console
-2. Navigate to the Storage section, and select Buckets
-3. Create a new bucket. Choose a unique name for your bucket.
-4. Note the bucket name for use in the `train_and_save_model.py` script and the GitHub Actions workflow.
+1. Create a GCS bucket named `mlops_assignment_bucket_1` (or update the bucket name in `train_and_save_model.py`)
+2. Create a service account with Storage Admin permissions
+3. Download the service account JSON key
 
-### Step 6: Upload the Service Account JSON Key to GitHub Actions Secrets
-1. Go to your GitHub repository's Settings.
-2. Navigate to Secrets and variables > Actions > New repository secret.
-3. Name the secret `GCP_SA_KEY`.
-4. Paste the entire contents of the service account JSON key file into the secret value field and click Add secret.
+### 4. Set Up GitHub Secrets
 
-### Step 7: Set Up GitHub Actions Workflow
-Now that you’ve added the JSON key, we can set up the GitHub Actions workflow to automate the model training and uploading process.
+Add the following secrets to your GitHub repository (`Settings > Secrets and variables > Actions`):
 
-1. In the root directory of the project, there should be a folder named `.github` and in this folder, there should be another folder (nested) named `workflows`. This is where GitHub Actions read different workflow `yaml` files. 
+| Secret Name | Description |
+|------------|-------------|
+| `GCP_SA_KEY` | Your GCP service account JSON key (entire contents) |
+| `EMAIL_USER` | Gmail address for sending reports |
+| `EMAIL_PASS` | Gmail app password ([generate here](https://myaccount.google.com/apppasswords)) |
 
-2. For the current project, there should be a file in `.github/workflows` named `train-and-upload.yml`. If not, create a file with this name and this file should have below content:
+### 5. Update Email Recipient
 
-```yaml
-name: Train and save model to GCS
+Edit `train_and_save_model.py` and change the recipient email:
 
-on:
-  schedule:
-    - cron: '0 0 * * *' # Run every day at midnight
-  workflow_dispatch: # Run manually
-
-jobs:
-  train_and_save:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout the code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-
-      - name: Get cache dir 
-        id: pip-cache-dir
-        run: echo "dir=$(pip cache dir)" >> $GITHUB_OUTPUT
-      
-      - name: Cache pip dependencies
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.pip-cache-dir.outputs.dir}}
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-      
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-      
-      - name: Authenticate with GCP
-        uses: 'google-github-actions/auth@v2'
-        with:
-          credentials_json: '${{ secrets.GCP_SA_KEY }}'
-
-      - name: Train and save model
-        run: |
-          python train_and_save_model.py
+```python
+recipient_email = "your_email@example.com"  # Line 89
 ```
- In this workflow we are instructing GitHub Actions to do below step by defining `train_and_save` job:
- 
- - Workflow is scheduled to run each day at midnight using cron expressions.
- - Then we check out the code (`actions/checkout@v4`), and then we set up a Python environment (`actions/setup-python@v5`) with version `3.10` to run the necessary scripts.
- - We get the directory where `pip` caches installed dependencies. 
-- Cache pip dependencies: this is a useful step which caches pip dependencies based on the `requirements.txt`. `key` parameter is set to be based on the `runner.os` and also we use `hashFiles('**/requirements.txt')` to generate a unique number based on the requiremenets. So, if in the future runs, requirements is updated, GitHub Actions will install the new dependencies. 
-- Authenticate with GCP: This step authenticates the GitHub Actions runner with Google Cloud using the service account key stored in the GitHub repository secrets as `GCP_SA_KEY`. This authentication allows the workflow to interact with Google Cloud resources, such as Google Cloud Storage (GCS).
+
+## 🎯 Usage
+
+### Manual Trigger via GitHub Actions
+
+1. Go to the **Actions** tab in your GitHub repository
+2. Select **"Train and save model to GCS"** workflow
+3. Click **"Run workflow"**
+4. Select the branch and click **"Run workflow"**
+
+## 📁 Project Structure
+
+```
+GitLabsExps/
+├── .github/
+│   └── workflows/
+│       └── train_and_save.yml    # GitHub Actions workflow
+├── train_and_save_model.py       # Main training script
+├── requirements.txt              # Python dependencies
+├── .gitignore                    # Git ignore rules
+└── README.md                     # This file
+```
+
+## 🔄 Workflow Pipeline
+
+```mermaid
+graph LR
+    A[Trigger Workflow] --> B[Setup Python 3.10]
+    B --> C[Cache Dependencies]
+    C --> D[Install Requirements]
+    D --> E[Authenticate GCP]
+    E --> F[Train Model]
+    F --> G{Accuracy ≥ 75%?}
+    G -->|Yes| H[Upload to GCS]
+    H --> I[Send Email Report]
+    I --> J[Success ✓]
+    G -->|No| K[Stop Pipeline ✗]
+```
+
+## 📊 Model Details
+
+- **Algorithm**: Random Forest Classifier
+- **Dataset**: Iris (150 samples, 4 features, 3 classes)
+- **Train/Test Split**: 80/20
+- **Hyperparameters**: 100 estimators, random_state=42
+- **Accuracy Threshold**: 75% minimum for deployment
+
+## 📧 Email Report Format
+
+The automated email includes:
+- Overall model accuracy
+- Detailed classification report (precision, recall, F1-score per class)
+- Timestamp and model location in GCS
+
+## 🗂️ Model Versioning
+
+Models are saved with timestamps in the following format:
+```
+gs://mlops_assignment_bucket_1/trained_models/model_YYYYMMDDHHMMSS.joblib
+```
+
+Example: `model_20250120143052.joblib`
+
+## 🛠️ Technologies Used
+
+- **Machine Learning**: scikit-learn
+- **Cloud Storage**: Google Cloud Storage
+- **CI/CD**: GitHub Actions
+- **Email**: smtplib (Gmail SMTP)
+- **Model Persistence**: joblib
