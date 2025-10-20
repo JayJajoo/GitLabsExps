@@ -107,7 +107,7 @@ def main():
     save_model_to_gcs(model, bucket_name, blob_name)
 
     # --- Send email report ---
-    recipient_email = "jayjajoo02@example.com"
+    recipient_email = "jayjajoo02@gmail.com"
     send_email_report(report, accuracy, recipient_email)
 
 
